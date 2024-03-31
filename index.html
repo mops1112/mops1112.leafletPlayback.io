@@ -2,49 +2,129 @@
 <html lang="zh-cn">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>leaflet.trackplayback</title>
-  <link rel="stylesheet" href="examples/lib/leaflet/leaflet.css">
-  <link rel="stylesheet" href="dist/control.playback.css">
-  <script src="examples/lib/leaflet/leaflet.js"></script>
-  <script src="dist/control.trackplayback.js"></script>
-  <script src="dist/leaflet.trackplayback.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>leaflet.trackplayback</title>
+    <link rel="stylesheet" href="https://linghuam.github.io/Leaflet.TrackPlayBack/examples/lib/leaflet/leaflet.css">
+    <link rel="stylesheet" href="https://mops1112.github.io/mops1112.leafletPlayback.io/dist/control.playback.css">
+    <script src="https://linghuam.github.io/Leaflet.TrackPlayBack/examples/lib/leaflet/leaflet.js"></script>
+    <script src="https://mops1112.github.io/mops1112.leafletPlayback.io/dist/control.trackplayback.js"></script>
+    <script src="https://linghuam.github.io/Leaflet.TrackPlayBack/dist/leaflet.trackplayback.js"></script>
 </head>
 
 <body>
-  <a href="https://github.com/linghuam/Leaflet.TrackPlayBack"><img style="position: absolute; top: 0; left: 0; border: 0;z-index: 999;"
-      src="https://s3.amazonaws.com/github/ribbons/forkme_left_green_007200.png" alt="Fork me on GitHub"></a>
-  <div id='mapid' style=" position: absolute; left: 0; top: 0; right: 0; bottom: 0; width: 100%; height: 100%; overflow: hidden;"></div>
-  <script>
-    // create map and add baseLayer
-    const map = L.map('mapid').setView([34.36384353883067, 134.09362792968753], 9);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
+    <div id="myText">aaaa</div>
+    <!-- <div id='mapid' style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; width: 100%; height: 100%; overflow: hidden;"></div> -->
+    <script>
+        // Function to receive data from React Native and initialize the map
 
-    // get data from server
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', 'examples/data/test.json', true);
-    xhr.onreadystatechange = xhrCallback;
-    xhr.send();
+        let map;
+        let trackplaybackControl;
+        // initMap([13.736717, 100.523186])
 
-    function xhrCallback() {
-      if (xhr.readyState === 4 && xhr.status === 200) {
-        const data = JSON.parse(xhr.responseText);
-        const trackplayback = L.trackplayback(data, map, {
-          targetOptions: {
-            useImg: true,
-            imgUrl: 'examples/ship.png'
-          }
-        });
-        const trackplaybackControl = L.trackplaybackcontrol(trackplayback);
-        trackplaybackControl.addTo(map);
-      }
-    }
+        function initMap(initialCoords) {
+            map = L.map('mapid').setView(initialCoords, 10);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
 
-  </script>
+            const streetLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+                minZoom: 1,
+                maxZoom: 15,
+                subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                // detectRetina: true,
+                attribution: '© Google Maps - Street'
+            });
+
+            streetLayer.addTo(map)
+            const satelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+                minZoom: 1,
+                maxZoom: 15,
+                subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                // detectRetina: true,
+                attribution: '© Google Maps - Satellite'
+            });
+
+            // Create object to hold tile layers
+            const baseLayers = {
+                "Street": streetLayer,
+                "Satellite": satelliteLayer
+            };
+
+            // Add layer control to switch between street and satellite views
+            L.control.layers(baseLayers).addTo(map);
+        }
+
+        function receiveDataFromReactNative(vehiclesJSON) {
+            try {
+                const data = vehiclesJSON;
+                if (data.length > 0) {
+                    const firstObject = data[data.length - 1]; // Get the first object from testData
+                    const initialCoords = [firstObject.lat, firstObject.lng]; // Extract coordinates
+                    initMap(initialCoords)
+                    const latLngs = data.map(item => [item.lat, item.lng]); // Extract lat/lng pairs from testData
+                    L.polyline(latLngs, {
+                        color: 'blue',
+                        weight: 3,
+                    }).addTo(map); // Create polyline
+
+                    // Calculate sum distance and max speed
+                    let sumDistance = 0;
+                    let maxSpeed = 0;
+                    for (let i = 1; i < data.length; i++) {
+                        const prevPoint = data[i - 1];
+                        const currPoint = data[i];
+                        const distance = L.latLng(prevPoint.lat, prevPoint.lng)
+                            .distanceTo(L.latLng(currPoint.lat, currPoint.lng));
+                        sumDistance += distance;
+                        maxSpeed = Math.max(maxSpeed, currPoint.speed);
+                    }
+
+                    // // Add icon under control layer
+                    // const iconDiv = document.createElement('div');
+                    // iconDiv.innerHTML = '<img src="icon.png" style="width: 50px; height: 50px;">';
+                    // iconDiv.style.position = 'absolute';
+                    // iconDiv.style.bottom = '100px'; // Adjust as needed
+                    // iconDiv.style.right = '10px';
+                    // iconDiv.style.zIndex = '1500'; // Adjust z-index value
+                    // map.getContainer().appendChild(iconDiv);
+                    // Clear previous track playback control if exists
+                    if (trackplaybackControl) {
+                        map.removeControl(trackplaybackControl);
+                    }
+
+                    const trackplayback = L.trackplayback(data, map, {
+
+                        targetOptions: {
+                            useImg: true,
+                            // imgUrl: 'https://linghuam.github.io/Leaflet.TrackPlayBack/examples/ship.png'
+                            imgUrl: 'logo.png'
+                        }
+                    });
+                    trackplaybackControl = L.trackplaybackcontrol(trackplayback, {
+                        title: `Distance: ${sumDistance.toFixed(2)} km. Max Speed ${maxSpeed.toFixed(2)} km./hr.`,
+                        position: 'bottomright',
+                    });
+                    trackplaybackControl.addTo(map);
+
+
+                } else {
+                    // If data is empty, display a message
+                    document.getElementById('mapid').innerHTML = "<div style='position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);'>Data is empty</div>";
+                }
+            } catch (error) {
+                console.error('Error processing vehicles data:', error);
+            }
+        }
+
+        // Function to clear the track playback control
+        function clearTrackPlaybackControl() {
+            if (trackplaybackControl) {
+                map.removeControl(trackplaybackControl);
+            }
+        }
+    </script>
 </body>
 
 </html>
